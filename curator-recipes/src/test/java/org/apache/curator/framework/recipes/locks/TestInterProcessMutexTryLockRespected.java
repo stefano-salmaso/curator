@@ -34,13 +34,16 @@ import java.util.concurrent.atomic.AtomicLong;
 public class TestInterProcessMutexTryLockRespected extends TestInterProcessMutexBase
 {
     private static final String LOCK_PATH = LOCK_BASE_PATH + "/our-lock";
+
     private static final long ACQUIRE_TIMEOUT_MILLIS = 3000;
-    private static final long ACQUIRE_TIMEOUT_MILLIS_TOLERANCE = 100;
+    private static final long ACQUIRE_TIMEOUT_MILLIS_TOLERANCE = 10;
+
     private static final int RESOURCE_MAXIMUM_USAGE_MILLIS = 5000;
     private static final int RESOURCE_MINIMUM_USAGE_MILLIS = 1000;
+
     private static final int THREAD_POOL_SIZE = 1000;
     private static final int REQUEST_PER_SECONDS = 200;
-    private static final int TEST_DURATION_SECONDS = 20;
+    private static final int TEST_DURATION_SECONDS = 15;
 
     AtomicLong failedTimeout = new AtomicLong(0);
 
@@ -53,7 +56,7 @@ public class TestInterProcessMutexTryLockRespected extends TestInterProcessMutex
     }
 
     @Test
-    public void testTryLockRespected() throws Exception
+    public void tryLockTimeout_shouldRespectedWithTolerance() throws Exception
     {
         //String connectString = "bfc-zookeeper-lock01.bravofly.intra:2181,bfc-zookeeper-lock02.bravofly.intra:2181,bfc-zookeeper-lock03.bravofly.intra:2181";
         String connectString = server.getConnectString();
@@ -69,6 +72,12 @@ public class TestInterProcessMutexTryLockRespected extends TestInterProcessMutex
             client.start();
             client.blockUntilConnected();
 
+            /*
+            Sumbit REQUEST_PER_SECONDS new TimeConsumingResource each second.
+            TimeConsumingResource execute acquire with lock timeout. If lock
+            was acquired, TimeConsumingResource held it for a random  number of milliseconds
+             (between  RESOURCE_MAXIMUM_USAGE_MILLISnd RESOURCE_MINIMUM_USAGE_MILLIS)
+             */
             new Thread(new Runnable()
             {
                 @Override
@@ -76,11 +85,10 @@ public class TestInterProcessMutexTryLockRespected extends TestInterProcessMutex
                 {
                     for(int i=0; i<TEST_DURATION_SECONDS; i++)
                     {
-                        System.out.println("...adding " + REQUEST_PER_SECONDS + " requests...");
+                        System.out.println("...submit " + REQUEST_PER_SECONDS + " new requests...");
                         for(int r=0; r < REQUEST_PER_SECONDS; r++)
                         {
                             threadPoolExecutor.execute(new TimeConsumingResource(client));
-
                         }
                         sleep(1000);
                     }
